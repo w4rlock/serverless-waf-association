@@ -1,0 +1,117 @@
+service: test-plugin
+
+plugins:
+  - ./index.js
+  - serverless-deployment-bucket
+
+provider:
+ name: aws
+ deploymentBucket:
+   name: sls.tst.teamname.us-east-1.aws.com
+   blockPublicAccess: true
+
+resources:
+  Resources:
+    StaticWebSiteBucket:
+      Type: 'AWS::S3::Bucket'
+      DeletionPolicy: Retain
+      Properties:
+        AccessControl: Private
+        BucketName: test-waf-ema
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+    CloudFrontOriginAccessIdentity:
+      Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
+      Properties:
+        CloudFrontOriginAccessIdentityConfig:
+          Comment: 'Cloud front access to S3'
+
+    WebsiteBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref StaticWebSiteBucket
+        PolicyDocument:
+          Statement:
+            -
+              Sid: "PublicReadGetObject"
+              Action:
+                - "s3:GetObject"
+              Effect: Allow
+
+    MyRestApi:
+      Type: 'AWS::ApiGateway::RestApi'
+      Properties:
+        Body:
+          OpenAPI specification: null
+        Description: A test API
+        Name: MyRestAPI
+
+    LoadBalancer:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Subnets: 'dddddd'
+
+    LoadBalancerListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        LoadBalancerArn: !Ref LoadBalancer
+        Port: 80
+        Protocol: HTTP
+        DefaultActions:
+          - Type: forward
+            TargetGroupArn: aadasda
+
+    DefaultTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Name: ddd-default
+        VpcId: aaaaaa
+        Port: 80
+        Protocol: HTTP
+
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      DependsOn:
+        #- StaticWebSiteBucket
+        - CloudFrontOriginAccessIdentity
+      Properties:
+        DistributionConfig:
+          DefaultCacheBehavior:
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            TargetOriginId: "s3-waf-ema"
+            Compress: true
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            ViewerProtocolPolicy: redirect-to-https
+          Enabled: true
+          DefaultRootObject: index.html
+          HttpVersion: "http2"
+          PriceClass: PriceClass_100
+          # required for cname field
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: 'true'
+          IPV6Enabled: false
+          CustomErrorResponses:
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+

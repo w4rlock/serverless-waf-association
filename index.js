@@ -1,7 +1,8 @@
+const _ = require('lodash');
 const BaseServerlessPlugin = require('base-serverless-plugin');
 
-const LOG_PREFFIX = '[ServerlessPlugin] -';
-const USR_CONF = 'pluginConfig';
+const LOG_PREFFIX = '[ServerlessWafAssociation] -';
+const USR_CONF = 'wafAssociation';
 
 class ServerlessPlugin extends BaseServerlessPlugin {
   /**
@@ -14,9 +15,10 @@ class ServerlessPlugin extends BaseServerlessPlugin {
     super(serverless, options, LOG_PREFFIX, USR_CONF);
 
     this.hooks = {
-      'after:deploy:deploy': this.dispatchAction.bind(this, this.deploy),
-      'after:info:info': this.dispatchAction.bind(this, this.info),
-      'after:remove:remove': this.dispatchAction.bind(this, this.remove),
+      'before:aws:package:finalize:saveServiceState': this.dispatchAction.bind(
+        this,
+        this.injectWebAclAssociations
+      ),
     };
   }
 
@@ -41,32 +43,84 @@ class ServerlessPlugin extends BaseServerlessPlugin {
    */
   loadConfig() {
     this.cfg = {};
-    this.cfg.prop = this.getConf('prop', 'default_value');
-    this.cfg.requiredProp = this.getConf('prop');
   }
 
   /**
-   * Deploy
+   * Inject Waf
    *
    */
-  async deploy() {
-    this.log('Deploy...');
+  async injectWebAclAssociations() {
+    const webAclArn = await ServerlessPlugin.getDefaultWafArn();
+    const cf = this.getCompiledTemplate();
+
+    if (cf.Resources) {
+      _.forEach(cf.Resources, (res, key) => {
+        // cloud front
+        if (res.Type === 'AWS::CloudFront::Distribution') {
+          _.set(res, 'Properties.DistributionConfig.WebACLId', webAclArn);
+          // API GATEWAYS
+        } else if (res.Type === 'AWS::ApiGateway::RestApi') {
+          const apigwArn = this.getApiGatewayArn(key);
+          // fn sub resolves the rest api ids
+          const ref = { 'Fn::Sub': apigwArn };
+          const assoc = ServerlessPlugin.createAssociation(webAclArn, ref);
+
+          assoc.DependsOn = [key];
+          cf.Resources[`WafAssociation${key}`] = assoc;
+          // LOAD BALANCER
+        } else if (res.Type.endsWith('::LoadBalancer')) {
+          // defaults reference returns an arn
+          const albArn = { Ref: key };
+          const assoc = ServerlessPlugin.createAssociation(webAclArn, albArn);
+          assoc.DependsOn = [key];
+          cf.Resources[`WafAssociation${key}`] = assoc;
+        }
+      });
+
+      // eslint-disable-next-line
+      console.log(JSON.stringify(cf.Resources, null, 2));
+    }
   }
 
   /**
-   * Info
+   * Get arn for api gateway rest api
    *
+   * @param {string} restApiId rest api id
+   * @returns {string} arn for rest api
    */
-  async info() {
-    this.log('Info...');
+  getApiGatewayArn(restApiId) {
+    const region = this.getRegion();
+    const stage = this.getStage();
+
+    return `arn:aws:apigateway:${region}::/restapis/\${${restApiId}}/stages/${stage}`;
   }
 
   /**
-   * Remove
+   * Create waf association
    *
+   * @param {string} webAclArn web acl arn
+   * @param {string} resourceArn api gateway or alb arn
+   * @returns {object} association object
    */
-  async remove() {
-    this.log('Removing...');
+  static createAssociation(webAclArn, resourceArn) {
+    return {
+      Type: 'AWS::WAFv2::WebACLAssociation',
+      Properties: {
+        WebACLArn: webAclArn,
+        ResourceArn: resourceArn,
+      },
+    };
+  }
+
+  /**
+   * Get WebAcl Arn
+   *
+   * @returns {string} arn webacl
+   */
+  static async getDefaultWafArn() {
+    // get waf arn from cloud formation output key
+    // or search webacl arn via aws-sdk tag
+    return 'arn:aws:wafv2:us-east-1:123456789012:global/webacl/ExampleWebACL/473e64fd-f30b-4765-81a0-62ad96dd167a';
   }
 }
 
