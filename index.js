@@ -55,30 +55,38 @@ class ServerlessPlugin extends BaseServerlessPlugin {
 
     if (cf.Resources) {
       _.forEach(cf.Resources, (res, key) => {
+        const newResAssocKey = `WafAssociation${key}`;
         // cloud front
         if (res.Type === 'AWS::CloudFront::Distribution') {
           _.set(res, 'Properties.DistributionConfig.WebACLId', webAclArn);
+
+          this.log(`Setting waf firewall to "${key}" CloudFront resource.`);
+
           // API GATEWAYS
         } else if (res.Type === 'AWS::ApiGateway::RestApi') {
           const apigwArn = this.getApiGatewayArn(key);
           // fn sub resolves the rest api ids
           const ref = { 'Fn::Sub': apigwArn };
           const assoc = ServerlessPlugin.createAssociation(webAclArn, ref);
-
           assoc.DependsOn = [key];
-          cf.Resources[`WafAssociation${key}`] = assoc;
-          // LOAD BALANCER
+          cf.Resources[newResAssocKey] = assoc;
+
+          this.log(`Setting waf firewall to "${key}" rest api resource.`);
+
+          // LOAD BALANCER V1 and V2 MATCH
         } else if (res.Type.endsWith('::LoadBalancer')) {
           // defaults reference returns an arn
           const albArn = { Ref: key };
           const assoc = ServerlessPlugin.createAssociation(webAclArn, albArn);
           assoc.DependsOn = [key];
-          cf.Resources[`WafAssociation${key}`] = assoc;
+          cf.Resources[newResAssocKey] = assoc;
+
+          this.log(`Setting waf firewall to "${key}" load balancer resource.`);
         }
       });
 
       // eslint-disable-next-line
-      console.log(JSON.stringify(cf.Resources, null, 2));
+      //console.log(JSON.stringify(cf.Resources, null, 2));
     }
   }
 
