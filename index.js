@@ -43,6 +43,8 @@ class ServerlessPlugin extends BaseServerlessPlugin {
    */
   loadConfig() {
     this.cfg = {};
+    // allows array or string inputs
+    this.cfg.skipResources = [].concat(this.getConf('skipResources', []));
   }
 
   /**
@@ -53,8 +55,14 @@ class ServerlessPlugin extends BaseServerlessPlugin {
     const webAclArn = await ServerlessPlugin.getDefaultWafArn();
     const cf = this.getCompiledTemplate();
 
+    // this.log(this.cfg.skipResources);
     if (cf.Resources) {
       _.forEach(cf.Resources, (res, key) => {
+        if (this.cfg.skipResources.indexOf(key) > -1) {
+          this.log(`Skipping resource "${key}"`);
+          return;
+        }
+
         const newResAssocKey = `WafAssociation${key}`;
         // cloud front
         if (res.Type === 'AWS::CloudFront::Distribution') {
