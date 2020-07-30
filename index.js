@@ -55,7 +55,6 @@ class ServerlessPlugin extends BaseServerlessPlugin {
     const webAclArn = await ServerlessPlugin.getDefaultWafArn();
     const cf = this.getCompiledTemplate();
 
-    // this.log(this.cfg.skipResources);
     if (cf.Resources) {
       _.forEach(cf.Resources, (res, key) => {
         if (this.cfg.skipResources.indexOf(key) > -1) {
@@ -64,16 +63,14 @@ class ServerlessPlugin extends BaseServerlessPlugin {
         }
 
         const newResAssocKey = `WafAssociation${key}`;
-        // cloud front
+        // CLOUD FRONT
         if (res.Type === 'AWS::CloudFront::Distribution') {
           _.set(res, 'Properties.DistributionConfig.WebACLId', webAclArn);
-
           this.log(`Setting waf firewall to "${key}" CloudFront resource.`);
 
           // API GATEWAYS
         } else if (res.Type === 'AWS::ApiGateway::RestApi') {
           const apigwArn = this.getApiGatewayArn(key);
-          // fn sub resolves the rest api ids
           const ref = { 'Fn::Sub': apigwArn };
           const assoc = ServerlessPlugin.createAssociation(webAclArn, ref);
           assoc.DependsOn = [key];
@@ -92,9 +89,6 @@ class ServerlessPlugin extends BaseServerlessPlugin {
           this.log(`Setting waf firewall to "${key}" load balancer resource.`);
         }
       });
-
-      // eslint-disable-next-line
-      //console.log(JSON.stringify(cf.Resources, null, 2));
     }
   }
 
