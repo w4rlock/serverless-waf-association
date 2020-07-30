@@ -68,7 +68,7 @@ class ServerlessPlugin extends BaseServerlessPlugin {
           _.set(res, 'Properties.DistributionConfig.WebACLId', webAclArn);
           this.log(`Setting waf firewall to "${key}" CloudFront resource.`);
 
-          // API GATEWAYS
+        // API GATEWAYS
         } else if (res.Type === 'AWS::ApiGateway::RestApi') {
           const apigwArn = this.getApiGatewayArn(key);
           const ref = { 'Fn::Sub': apigwArn };
@@ -78,7 +78,7 @@ class ServerlessPlugin extends BaseServerlessPlugin {
 
           this.log(`Setting waf firewall to "${key}" rest api resource.`);
 
-          // LOAD BALANCER V1 and V2 MATCH
+        // LOAD BALANCER V1 and V2 MATCH
         } else if (res.Type.endsWith('::LoadBalancer')) {
           // defaults reference returns an arn
           const albArn = { Ref: key };
