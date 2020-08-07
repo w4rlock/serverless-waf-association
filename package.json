@@ -30,7 +30,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "base-serverless-plugin": "0.5.3",
+    "base-serverless-plugin": "0.5.4",
     "lodash": "4.17.19",
     "standard-version": "8.0.2"
   },
