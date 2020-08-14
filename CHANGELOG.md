@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.4](https://github.com/w4rlock/serverless-waf-association/compare/release-0.0.3...release-0.0.4) (2020-08-14)
+
+
+### Bug Fixes
+
+* api gateway association ([ec3d88d](https://github.com/w4rlock/serverless-waf-association/commit/ec3d88d03ed5bc776ba3209483ebd8c8f45eb880))
+
 ### 0.0.3 (2020-08-07)
 
 

@@ -7,6 +7,7 @@ const USR_CONF = 'wafAssociation';
 const API_GATEWAY_TYPE = 'AWS::ApiGateway::RestApi';
 const CLOUD_FRONT_TYPE = 'AWS::CloudFront::Distribution';
 const ANY_LOAD_BALANCER_TYPE = '::LoadBalancer';
+const API_GATEWAY_DEPLOYMENT_TYPE = 'AWS::ApiGateway::Deployment';
 
 class ServerlessPlugin extends BaseServerlessPlugin {
   /**
@@ -115,8 +116,12 @@ class ServerlessPlugin extends BaseServerlessPlugin {
           const apigwArn = this.getApiGatewayArn(key);
           const ref = { 'Fn::Sub': apigwArn };
           const assoc = ServerlessPlugin.createAssociation(webAclArn, ref);
+          // eslint-disable-next-line
+          const deploymentKey = await this.findDeploymentApiGatewayResource(
+            key
+          );
+          assoc.DependsOn = [key, deploymentKey];
 
-          assoc.DependsOn = [key];
           cf.Resources[newResAssocKey] = assoc;
           this.log(`Setting waf firewall to "${key}" rest api resource.`);
 
@@ -170,6 +175,35 @@ class ServerlessPlugin extends BaseServerlessPlugin {
         ResourceArn: resourceArn,
       },
     };
+  }
+
+  /**
+   * Find Deployment Resource Id for Api Gateway Rest Api
+   *
+   * @param {string} apiGatewayKey RestApi Id
+   * @returns {string} api gateway deployment id
+   */
+  async findDeploymentApiGatewayResource(apiGatewayKey) {
+    const cf = this.getCompiledTemplate();
+    let deploymentKey = '';
+
+    if (cf.Resources) {
+      const entries = Object.entries(cf.Resources);
+      for (let i = 0; i < entries.length; i += 1) {
+        const [key, res] = entries[i];
+
+        if (res.Type === API_GATEWAY_DEPLOYMENT_TYPE) {
+          const ref = _.get(res, 'Properties.RestApiId.Ref');
+
+          if (ref === apiGatewayKey) {
+            deploymentKey = key;
+            break;
+          }
+        }
+      }
+    }
+
+    return deploymentKey;
   }
 
   /**
