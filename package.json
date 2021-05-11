@@ -31,7 +31,7 @@
   "license": "ISC",
   "dependencies": {
     "base-serverless-plugin": "0.5.4",
-    "lodash": "4.17.19",
+    "lodash": "4.17.21",
     "standard-version": "8.0.2"
   },
   "devDependencies": {
